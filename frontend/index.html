@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 會員系統</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; background-color: #f0f2f5; margin: 0; padding-top: 50px; }
+        .container { background-color: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; margin-bottom: 20px; }
+        h1, h2 { color: #333; }
+        input[type="text"], input[type="password"] { width: calc(100% - 24px); padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; margin: 10px 0 0; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        #message { margin-top: 15px; font-weight: bold; }
+        .success { color: green; }
+        .error { color: red; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-forms" class="container">
+        <h1>會員系統</h1>
+        
+        <h2>註冊</h2>
+        <form id="registerForm">
+            <input type="text" id="regUsername" placeholder="使用者名稱" required>
+            <input type="password" id="regPassword" placeholder="密碼" required>
+            <button type="submit">註冊</button>
+        </form>
+
+        <h2>登入</h2>
+        <form id="loginForm">
+            <input type="text" id="logUsername" placeholder="使用者名稱" required>
+            <input type="password" id="logPassword" placeholder="密碼" required>
+            <button type="submit">登入</button>
+        </form>
+        <p id="message"></p>
+    </div>
+
+    <div id="profile-section" class="container hidden">
+        <h2>會員資料</h2>
+        <p>使用者名稱: <strong id="username-display"></strong></p>
+        <button id="getProfileBtn">重新整理會員資料</button>
+        <button id="logoutBtn">登出</button>
+        <p id="profileMessage"></p>
+    </div>
+    
+    <div id="admin-section" class="container hidden">
+        <h2>管理員面板</h2>
+        <button id="getAllUsersBtn">檢視所有會員</button>
+        <ul id="user-list"></ul>
+        <p id="adminMessage"></p>
+    </div>
+
+    <script>
+            const registerForm = document.getElementById('registerForm');
+            const loginForm = document.getElementById('loginForm');
+            const getProfileBtn = document.getElementById('getProfileBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const getAllUsersBtn = document.getElementById('getAllUsersBtn');
+            
+            const authForms = document.getElementById('auth-forms');
+            const profileSection = document.getElementById('profile-section');
+            const adminSection = document.getElementById('admin-section');
+            
+            const messageDisplay = document.getElementById('message');
+            const usernameDisplay = document.getElementById('username-display');
+            const profileMessageDisplay = document.getElementById('profileMessage');
+            const adminMessageDisplay = document.getElementById('adminMessage');
+            const userList = document.getElementById('user-list');
+        
+            let jwtToken = localStorage.getItem('jwtToken');
+            let currentUser = null;
+        
+            // 檢查登入狀態，並顯示相應的區塊
+            function checkLoginState() {
+                if (jwtToken) {
+                    authForms.classList.add('hidden');
+                    profileSection.classList.remove('hidden');
+                    getProfile();
+                } else {
+                    authForms.classList.remove('hidden');
+                    profileSection.classList.add('hidden');
+                    adminSection.classList.add('hidden'); // 登出時隱藏管理員區塊
+                }
+            }
+        
+            // 顯示訊息
+            function showMessage(element, text, isError = false) {
+                element.textContent = text;
+                element.className = isError ? 'error' : 'success';
+            }
+        
+            // 註冊表單提交
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = e.target.regUsername.value;
+                const password = e.target.regPassword.value;
+        
+                try {
+                    const res = await fetch('http://localhost:8080/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        showMessage(messageDisplay, data.message);
+                    } else {
+                        showMessage(messageDisplay, data.error, true);
+                    }
+                } catch (err) {
+                    showMessage(messageDisplay, '連線失敗，請檢查伺服器是否運行。', true);
+                }
+            });
+        
+            // 登入表單提交
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = e.target.logUsername.value;
+                const password = e.target.logPassword.value;
+
+                try {
+                    const res = await fetch('http://localhost:8080/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.token) {
+                        jwtToken = data.token;
+                        localStorage.setItem('jwtToken', jwtToken);
+                        showMessage(messageDisplay, '登入成功，正在跳轉...', false); // 提示訊息
+                        
+                        // 💡 登入成功後跳轉到 profile.html
+                        window.location.href = "profile.html";
+
+                    } else {
+                        showMessage(messageDisplay, data.error, true);
+                    }
+                } catch (err) {
+                    showMessage(messageDisplay, '連線失敗，請檢查伺服器是否運行。', true);
+                }
+            });
+        
+            // 取得會員資料
+            async function getProfile() {
+                if (!jwtToken) return;
+        
+                try {
+                    const res = await fetch('http://localhost:8080/api/profile', {
+                        headers: { 'Authorization': jwtToken }
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        currentUser = data.user;
+                        usernameDisplay.textContent = currentUser.username;
+                        showMessage(profileMessageDisplay, '會員資料載入成功。');
+                        
+                        // 💡 檢查是否為管理員，如果是則顯示管理員區塊
+                        if (currentUser.is_admin) {
+                            adminSection.classList.remove('hidden');
+                        } else {
+                            adminSection.classList.add('hidden');
+                        }
+        
+                    } else {
+                        showMessage(profileMessageDisplay, data.error, true);
+                        if (res.status === 401) {
+                            logout();
+                        }
+                    }
+                } catch (err) {
+                    showMessage(profileMessageDisplay, '連線失敗，請檢查伺服器是否運行。', true);
+                }
+            }
+        
+            // 💡 取得所有會員資料（管理員功能）
+            async function getAllUsers() {
+                if (!currentUser || !currentUser.is_admin) {
+                    showMessage(adminMessageDisplay, '您沒有權限存取此功能。', true);
+                    return;
+                }
+        
+                try {
+                    const res = await fetch('http://localhost:8080/api/admin/users', {
+                        headers:{
+                        'Authorization': `Bearer ${jwtToken}`
+                        }
+                    });
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        userList.innerHTML = ''; // 清空列表
+                        data.users.forEach(user => {
+                            const li = document.createElement('li');
+                            li.textContent = `ID: ${user.ID}, 使用者名稱: ${user.Username}, 管理員: ${user.IsAdmin}`;
+                            userList.appendChild(li);
+                        });
+                        showMessage(adminMessageDisplay, '所有會員資料載入成功。');
+                    } else {
+                        showMessage(adminMessageDisplay, data.error, true);
+                    }
+                } catch (err) {
+                    showMessage(adminMessageDisplay, '連線失敗，請檢查伺服器是否運行。', true);
+                }
+            }
+        
+            // 登出
+            function logout() {
+                localStorage.removeItem('jwtToken');
+                jwtToken = null;
+                currentUser = null;
+                showMessage(messageDisplay, '您已登出。');
+                checkLoginState();
+            }
+        
+            getProfileBtn.addEventListener('click', getProfile);
+            logoutBtn.addEventListener('click', logout);
+            getAllUsersBtn.addEventListener('click', getAllUsers);
+        
+            document.addEventListener('DOMContentLoaded', checkLoginState);
+    </script>
+</body>
+</html>

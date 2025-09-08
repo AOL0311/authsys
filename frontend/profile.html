@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>會員中心</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; background-color: #f0f2f5; margin: 0; padding-top: 50px; }
+        .container { background-color: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; margin-bottom: 20px; }
+        h1, h2 { color: #333; }
+        button { width: 100%; padding: 12px; margin: 10px 0 0; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        .hidden { display: none; }
+        #message { margin-top: 15px; font-weight: bold; color: green; }
+        #adminMessage { color: red; }
+    </style>
+</head>
+<body>
+
+    <div id="profile-section" class="container">
+        <h1>會員中心</h1>
+        <h2>會員資料</h2>
+        <p>使用者名稱: <strong id="username-display"></strong></p>
+        <button id="getProfileBtn">重新整理會員資料</button>
+        <button id="logoutBtn">登出</button>
+        <p id="profileMessage"></p>
+    </div>
+    
+    <div id="admin-section" class="container hidden">
+        <h2>管理員面板</h2>
+        <button id="getAllUsersBtn">檢視所有會員</button>
+        <ul id="user-list"></ul>
+        <p id="adminMessage"></p>
+    </div>
+
+    <script>
+        const getProfileBtn = document.getElementById('getProfileBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const getAllUsersBtn = document.getElementById('getAllUsersBtn');
+        
+        const profileSection = document.getElementById('profile-section');
+        const adminSection = document.getElementById('admin-section');
+        
+        const usernameDisplay = document.getElementById('username-display');
+        const profileMessageDisplay = document.getElementById('profileMessage');
+        const adminMessageDisplay = document.getElementById('adminMessage');
+        const userList = document.getElementById('user-list');
+    
+        let jwtToken = localStorage.getItem('jwtToken');
+        let currentUser = null;
+
+        // 檢查登入狀態，如果沒有令牌就跳轉回登入頁
+        function checkLoginState() {
+            if (!jwtToken) {
+                window.location.href = "index.html";
+            } else {
+                getProfile();
+            }
+        }
+    
+        // 顯示訊息
+        function showMessage(element, text, isError = false) {
+            element.textContent = text;
+            element.style.color = isError ? 'red' : 'green';
+        }
+    
+        // 取得會員資料
+        async function getProfile() {
+            try {
+                const res = await fetch('http://localhost:8080/api/profile', {
+                    headers: { 'Authorization': `Bearer ${jwtToken}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    currentUser = data.user;
+                    usernameDisplay.textContent = currentUser.username;
+                    showMessage(profileMessageDisplay, '會員資料載入成功。');
+                    
+                    if (currentUser.is_admin) {
+                        adminSection.classList.remove('hidden');
+                    } else {
+                        adminSection.classList.add('hidden');
+                    }
+    
+                } else {
+                    showMessage(profileMessageDisplay, data.error, true);
+                    if (res.status === 401) {
+                        logout();
+                    }
+                }
+            } catch (err) {
+                showMessage(profileMessageDisplay, '連線失敗，請檢查伺服器是否運行。', true);
+            }
+        }
+    
+        // 取得所有會員資料（管理員功能）
+        async function getAllUsers() {
+            if (!currentUser || !currentUser.is_admin) {
+                showMessage(adminMessageDisplay, '您沒有權限存取此功能。', true);
+                return;
+            }
+    
+            try {
+                const res = await fetch('http://localhost:8080/api/admin/users', {
+                    headers: { 'Authorization': `Bearer ${jwtToken}` }
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    userList.innerHTML = '';
+                    data.users.forEach(user => {
+                        const li = document.createElement('li');
+                        li.textContent = `ID: ${user.ID}, 使用者名稱: ${user.Username}, 管理員: ${user.IsAdmin}`;
+                        userList.appendChild(li);
+                    });
+                    showMessage(adminMessageDisplay, '所有會員資料載入成功。');
+                } else {
+                    showMessage(adminMessageDisplay, data.error, true);
+                }
+            } catch (err) {
+                showMessage(adminMessageDisplay, '連線失敗，請檢查伺服器是否運行。', true);
+            }
+        }
+    
+        // 登出
+        function logout() {
+            localStorage.removeItem('jwtToken');
+            jwtToken = null;
+            currentUser = null;
+            window.location.href = "index.html";
+        }
+    
+        getProfileBtn.addEventListener('click', getProfile);
+        logoutBtn.addEventListener('click', logout);
+        getAllUsersBtn.addEventListener('click', getAllUsers);
+    
+        document.addEventListener('DOMContentLoaded', checkLoginState);
+    </script>
+</body>
+</html>
