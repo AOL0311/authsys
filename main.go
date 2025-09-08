@@ -9,14 +9,13 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5" // 💡 新增 JWT 庫
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-// Claims 定義了 JWT 的 payload
 type Claims struct {
 	Username string `json:"username"`
 	IsAdmin  bool   `json:"is_admin"`
@@ -31,7 +30,7 @@ type User struct {
 }
 
 var db *gorm.DB
-var jwtSecret = []byte("your-super-secret-key") // 💡 新增 JWT 密鑰
+var jwtSecret = []byte("your-super-secret-key")
 
 func ConnectDB() {
 	err := godotenv.Load()
@@ -91,7 +90,6 @@ func Register(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Registration successful"})
 }
 
-// 💡 更新後的 Login 函式
 func Login(c *gin.Context) {
 	var input User
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -110,7 +108,6 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 創建 JWT Claims
 	claims := &Claims{
 		Username: user.Username,
 		IsAdmin:  user.IsAdmin,
@@ -119,7 +116,6 @@ func Login(c *gin.Context) {
 		},
 	}
 
-	// 產生簽名過的 JWT 令牌字串
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(jwtSecret)
 	if err != nil {
@@ -127,11 +123,9 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 💡 回傳令牌字串，而不是 gin.H
 	c.JSON(http.StatusOK, gin.H{"token": tokenString, "message": "Login successful"})
 }
 
-// 💡 更新後的 AuthMiddleware 函式
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -147,7 +141,6 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 		tokenString := parts[1]
 
-		// 解析和驗證令牌
 		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 			return jwtSecret, nil
 		})
@@ -168,7 +161,6 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// 💡 更新後的 AdminMiddleware 函式
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims, exists := c.Get("user")
