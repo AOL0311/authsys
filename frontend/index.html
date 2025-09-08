@@ -73,7 +73,6 @@
             let jwtToken = localStorage.getItem('jwtToken');
             let currentUser = null;
         
-            // 檢查登入狀態，並顯示相應的區塊
             function checkLoginState() {
                 if (jwtToken) {
                     authForms.classList.add('hidden');
@@ -82,17 +81,15 @@
                 } else {
                     authForms.classList.remove('hidden');
                     profileSection.classList.add('hidden');
-                    adminSection.classList.add('hidden'); // 登出時隱藏管理員區塊
+                    adminSection.classList.add('hidden');
                 }
             }
         
-            // 顯示訊息
             function showMessage(element, text, isError = false) {
                 element.textContent = text;
                 element.className = isError ? 'error' : 'success';
             }
         
-            // 註冊表單提交
             registerForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const username = e.target.regUsername.value;
@@ -115,7 +112,6 @@
                 }
             });
         
-            // 登入表單提交
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const username = e.target.logUsername.value;
@@ -131,9 +127,8 @@
                     if (res.ok && data.token) {
                         jwtToken = data.token;
                         localStorage.setItem('jwtToken', jwtToken);
-                        showMessage(messageDisplay, '登入成功，正在跳轉...', false); // 提示訊息
+                        showMessage(messageDisplay, '登入成功，正在跳轉...', false);
                         
-                        // 💡 登入成功後跳轉到 profile.html
                         window.location.href = "profile.html";
 
                     } else {
@@ -144,7 +139,6 @@
                 }
             });
         
-            // 取得會員資料
             async function getProfile() {
                 if (!jwtToken) return;
         
@@ -158,7 +152,6 @@
                         usernameDisplay.textContent = currentUser.username;
                         showMessage(profileMessageDisplay, '會員資料載入成功。');
                         
-                        // 💡 檢查是否為管理員，如果是則顯示管理員區塊
                         if (currentUser.is_admin) {
                             adminSection.classList.remove('hidden');
                         } else {
@@ -176,7 +169,6 @@
                 }
             }
         
-            // 💡 取得所有會員資料（管理員功能）
             async function getAllUsers() {
                 if (!currentUser || !currentUser.is_admin) {
                     showMessage(adminMessageDisplay, '您沒有權限存取此功能。', true);
@@ -192,7 +184,7 @@
                     const data = await res.json();
                     
                     if (res.ok) {
-                        userList.innerHTML = ''; // 清空列表
+                        userList.innerHTML = '';
                         data.users.forEach(user => {
                             const li = document.createElement('li');
                             li.textContent = `ID: ${user.ID}, 使用者名稱: ${user.Username}, 管理員: ${user.IsAdmin}`;
@@ -207,7 +199,6 @@
                 }
             }
         
-            // 登出
             function logout() {
                 localStorage.removeItem('jwtToken');
                 jwtToken = null;
